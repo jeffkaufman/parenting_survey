@@ -216,6 +216,25 @@ ax.set_ylabel("Caution z-score")
 fig.savefig("caution-by-age-of-oldest-big.png", dpi=180)
 plt.close()
 
+def tidy_label(variable, val):
+    if variable in ["area", "childhood_area"]:
+        short = {
+            "very urban": "URB+",
+            "moderately urban": "URB",
+            "slightly urban": "URB-",
+            "suburban": "SBR",
+            "exurban": "EXB",
+            "rural": "RUR",
+        }[val[-1]]
+        if variable == "area":
+            return short + ", now"
+        return short + ", then"
+    elif variable == "n_children":
+        return val + " kids"
+    else:
+        return val
+
+
 fig, ax = plt.subplots(constrained_layout=True)
 x = []
 labels = []
@@ -230,14 +249,8 @@ for variable in [
         vals = [record['mean_zscore']
                 for record in records
                 if include(record) and record[variable] == val]
-        if variable == "area":
-            label = val[-1] + ", currently"
-        elif variable == "childhood_area":
-            label = val[-1] + ", as child"
-        elif variable == "n_children":
-            label = val + " kids"
-        else:
-            label = val
+
+        label = tidy_label(variable, val)
 
         labels.append("%s (n=%s)" % (label, len(vals)))
         x.append(vals)
@@ -289,8 +302,11 @@ plt.close()
 """
 
 for question_slug, question_value in questions.items():
-    fig, ax = plt.subplots(constrained_layout=True)
-
+    fig, axs = plt.subplots(constrained_layout=True, nrows=2, ncols=1,
+                            figsize=(10,10),
+                            gridspec_kw={'height_ratios': [1, 2]},
+                            sharex=True)
+    ax = axs[0]
     all_xs = set()
     all_xs |= typicals[question_slug].keys()
     all_xs |= earlies[question_slug].keys()
@@ -315,6 +331,35 @@ for question_slug, question_value in questions.items():
         ", assuming they can cross all the streets",
         "\n(assuming they can cross all the streets)"))
     ax.legend()
+
+    ax = axs[1]
+    x = []
+    labels = []
+    for variable in [
+            "childhood_area", "area", "n_children", "gender"]:
+        def include(record):
+            return record[variable] and not np.isnan(
+                record['questions'][question_slug][0])
+
+        for val in sorted(set(record[variable]
+                              for record in records
+                              if include(record)),
+                          reverse=True):
+            vals = [record['questions'][question_slug][0]
+                    for record in records
+                    if include(record) and record[variable] == val]
+            label = tidy_label(variable, val)
+
+            if len(vals) < 3:
+                continue
+
+            labels.append("%s (n=%s)" % (label, len(vals)))
+            x.append(vals)
+
+        if variable != "gender":
+            labels.append("")
+            x.append([])
+    ax.boxplot(x, labels=labels, vert=False, showfliers=False)
     fig.savefig(question_slug + "-big.png", dpi=180)
     plt.close()
 
