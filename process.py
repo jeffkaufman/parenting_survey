@@ -344,6 +344,18 @@ fig.savefig("individual-consistency-big.png", dpi=180)
 plt.close()
 """
 
+# n, question_slug
+questions_by_mean_typical_age = [
+    question_slug
+    for (mean_typical_age, question_slug) in sorted(
+            (np.average([record["questions"][question_slug][0]
+                         for record in records
+                         if not np.isnan(record["questions"][
+                                 question_slug][0])]),
+             question_slug)
+            for question_slug in questions)
+]
+
 for question_slug, question_value in questions.items():
     fig, axs = plt.subplots(constrained_layout=True, nrows=2, ncols=1,
                             figsize=(10,10),
@@ -417,31 +429,6 @@ for question_slug, question_value in questions.items():
         for point in points:
             histogram[point] += 1
 
-        """
-                xs = []
-                ys = []
-                for point, count in histogram.items():
-                    pos = np.array([0, 0])
-                    direction = (1, 0)
-                    leg_len = 1
-                    leg_pos = 0
-                    for i in range(count):
-                        xs.append(point + pos[0]/20)
-                        ys.append(base_y + pos[1]/10)
-
-                        if leg_pos == leg_len:
-                            direction = {
-                                (1,0): (0,1),
-                                (0,1): (-1,0),
-                                (-1,0): (0,-1),
-                                (0,-1): (1,0)}[direction]
-                            leg_pos = 0
-                            leg_len +=1
-                        pos = pos + direction
-                        leg_pos += 1
-        """
-
-
         xs = []
         ys = []
         for point in points:
@@ -459,7 +446,9 @@ for question_slug, question_value in questions.items():
 
         ax.plot(xs, ys, 'b.', alpha=0.2)
 
-    fig.savefig("cdf-" + question_slug + "-big.png", dpi=180)
+    fig.savefig("cdf-" +
+                str(questions_by_mean_typical_age.index(question_slug)).zfill(2) +
+                "-" + question_slug + "-big.png", dpi=180)
     plt.close()
 
 
