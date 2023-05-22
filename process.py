@@ -11,12 +11,18 @@ def is_na(s):
             "The age where they can",
             "Different for each of these",
             "Wouldn’t",
-            "still in utero"
+            "still in utero",
+            "No sidewalk",
+            "no sidewak",
+            "no public transit",
+            "I don’t know",
         ])
 
 def clean_age(s):
     if is_na(s):
         return float('nan')
+    s = s.replace("/", "-")
+    s = s.replace(", but depends", "")
     s = s.replace("⁷", "7")
     s = re.sub(" [(].*[)]$", "", s)
     if "-" in s:
@@ -359,8 +365,62 @@ for question_slug, question_value in questions.items():
         if variable != "gender":
             labels.append("")
             x.append([])
-    ax.boxplot(x, labels=labels, vert=False, showfliers=False)
-    fig.savefig(question_slug + "-big.png", dpi=180)
+    box = ax.boxplot(x, labels=labels, vert=False, showfliers=False)
+    for _, line_list in box.items():
+        for line in line_list:
+            line.set_color((0,0,0,.3))
+
+    for n, points in enumerate(x):
+        xs_prejitter = points
+        ys_prejitter = [n+1 for _ in points]
+
+        histogram = Counter()
+        for point in points:
+            histogram[point] += 1
+
+        """
+                xs = []
+                ys = []
+                for point, count in histogram.items():
+                    pos = np.array([0, 0])
+                    direction = (1, 0)
+                    leg_len = 1
+                    leg_pos = 0
+                    for i in range(count):
+                        xs.append(point + pos[0]/20)
+                        ys.append(base_y + pos[1]/10)
+
+                        if leg_pos == leg_len:
+                            direction = {
+                                (1,0): (0,1),
+                                (0,1): (-1,0),
+                                (-1,0): (0,-1),
+                                (0,-1): (1,0)}[direction]
+                            leg_pos = 0
+                            leg_len +=1
+                        pos = pos + direction
+                        leg_pos += 1
+        """
+
+
+        xs = []
+        ys = []
+        for point in points:
+            xval = point
+            yval = n+1
+            jitter_scale = histogram[point] - 1
+            xval += np.random.normal(0, jitter_scale/150, size=1)[0]
+            yval += max(
+                min(np.random.normal(0, jitter_scale/100, size=1)[0],
+                    .4),
+                -.4)
+
+            xs.append(xval)
+            ys.append(yval)
+
+        ax.plot(xs, ys, 'b.', alpha=0.2)
+
+    fig.savefig("cdf-" + question_slug + "-big.png", dpi=180)
     plt.close()
 
 
