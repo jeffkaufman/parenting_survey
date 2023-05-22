@@ -222,45 +222,76 @@ ax.set_ylabel("Caution z-score")
 fig.savefig("caution-by-age-of-oldest-big.png", dpi=180)
 plt.close()
 
-def tidy_label(variable, val):
-    if variable in ["area", "childhood_area"]:
-        short = {
-            "very urban": "URB+",
-            "moderately urban": "URB",
-            "slightly urban": "URB-",
-            "suburban": "SBR",
-            "exurban": "EXB",
-            "rural": "RUR",
+def tidy_label(variable, record):
+    val = record[variable]
+    if variable == "area":
+        return {
+            "very urban": (1, "URB now"),
+            "moderately urban": (1, "URB now"),
+            "slightly urban": (1, "URB now"),
+            "suburban": (2, "SBR now"),
+            "exurban": (3, "EXB now"),
+            "rural": (4, "RUR now"),
         }[val[-1]]
-        if variable == "area":
-            return short + ", now"
-        return short + ", then"
+    if variable == "childhood_area":
+        return {
+            "very urban": (1, "URB then"),
+            "moderately urban": (1, "URB then"),
+            "slightly urban": (1, "URB then"),
+            "suburban": (2, "SBR then"),
+            "exurban": (3, "EXB then"),
+            "rural": (4, "RUR then"),
+        }[val[-1]]
     elif variable == "n_children":
         return val + " kids"
+    elif variable == "oldest":
+        if val <= 2:
+            return 1, "oldest 0-2"
+        elif val <= 5:
+            return 2, "oldest 3-5"
+        elif val <= 8:
+            return 3, "oldest 6-8"
+        elif val <= 12:
+            return 4, "oldest 9-12"
+        else:
+            return 5, "oldest 13+"
     else:
         return val
 
 
-fig, ax = plt.subplots(constrained_layout=True)
+fig, ax = plt.subplots(constrained_layout=True, figsize=(8,8)
 x = []
 labels = []
 for variable in [
-        "childhood_area", "area", "n_children", "gender"]:
+        "childhood_area", "area", "oldest", "n_children", "gender"]:
     def include(record):
         return record[variable] and not np.isnan(record['mean_zscore'])
-    for val in sorted(set(record[variable]
+    for label in sorted(set(tidy_label(variable, record)
                           for record in records
                           if include(record)),
                       reverse=True):
         vals = [record['mean_zscore']
                 for record in records
-                if include(record) and record[variable] == val]
-
-        label = tidy_label(variable, val)
+                if include(record) and tidy_label(variable, record) == label]
+        if type(label) == type(()):
+            _, label = label
 
         labels.append("%s (n=%s)" % (label, len(vals)))
         x.append(vals)
+
+    if variable != "gender":
+        labels.append("")
+        x.append([])
 ax.boxplot(x, labels=labels, vert=False, showfliers=False)
+
+for n, points in enumerate(x):
+    xs_prejitter = points
+    ys_prejitter = [n+1 for _ in points]
+
+    xs = xs_prejitter + np.random.normal(0, 0.05, size=(len(points)))
+    ys = ys_prejitter + np.random.normal(0, 0.05, size=(len(points)))
+    ax.plot(xs, ys, 'b.', alpha=0.2)
+
 ax.set_title("Factors influencing caution")
 ax.set_xlabel("Mean z-score")
 fig.savefig("factors-big.png", dpi=180)
@@ -342,22 +373,24 @@ for question_slug, question_value in questions.items():
     x = []
     labels = []
     for variable in [
-            "childhood_area", "area", "n_children", "gender"]:
+            "childhood_area", "area", "oldest", "n_children", "gender"]:
         def include(record):
             return record[variable] and not np.isnan(
                 record['questions'][question_slug][0])
 
-        for val in sorted(set(record[variable]
+        for label in sorted(set(tidy_label(variable, record)
                               for record in records
                               if include(record)),
                           reverse=True):
             vals = [record['questions'][question_slug][0]
                     for record in records
-                    if include(record) and record[variable] == val]
-            label = tidy_label(variable, val)
+                    if include(record) and tidy_label(variable, record) == label]
 
             if len(vals) < 3:
                 continue
+
+            if type(label) == type(()):
+                _, label = label
 
             labels.append("%s (n=%s)" % (label, len(vals)))
             x.append(vals)
