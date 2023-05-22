@@ -255,11 +255,17 @@ def tidy_label(variable, record):
             return 4, "oldest 9-12"
         else:
             return 5, "oldest 13+"
+    elif variable == "gender":
+        return {
+            "Female": (1, "female"),
+            "Non-binary": (2, "non-binary"),
+            "Male": (3, "male"),
+        }[val]
     else:
         return val
 
 
-fig, ax = plt.subplots(constrained_layout=True, figsize=(8,8)
+fig, ax = plt.subplots(constrained_layout=True, figsize=(8,8))
 x = []
 labels = []
 for variable in [
