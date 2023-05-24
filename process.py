@@ -16,6 +16,11 @@ def is_na(s):
             "no sidewak",
             "no public transit",
             "I don’t know",
+            "Depends on",
+            "legally set at 8 in my state",
+            "depends on",
+            "10? 12? so few good options here.",
+            "ha. if only they'd learned.",
         ])
 
 def clean_age(s):
@@ -25,6 +30,9 @@ def clean_age(s):
     s = s.replace(", but depends", "")
     s = s.replace("⁷", "7")
     s = re.sub(" [(].*[)]$", "", s)
+    s = s.replace(
+        "9 due to threat of CPS; 8 due to threat of stranger danger. I'd let "
+        "a younger child play in neighborhood woods alone.", "8")
     if "-" in s:
         return np.average([int(x) for x in s.split("-")])
     if s.endswith(" months"):
@@ -226,9 +234,9 @@ def tidy_label(variable, record):
     val = record[variable]
     if variable == "area":
         return {
-            "very urban": (1, "URB now"),
-            "moderately urban": (1, "URB now"),
-            "slightly urban": (1, "URB now"),
+            "very urban": (0, "URB now"),
+            "moderately urban": (0, "URB now"),
+            "slightly urban": (1, "~URB now"),
             "suburban": (2, "SBR now"),
             "exurban": (3, "EXB now"),
             "rural": (4, "RUR now"),
@@ -451,6 +459,41 @@ for question_slug, question_value in questions.items():
                 "-" + question_slug + "-big.png", dpi=180)
     plt.close()
 
+fig, axs = plt.subplots(constrained_layout=True, nrows=13, ncols=1,
+                        figsize=(8,24),
+                        sharey=True,
+                        sharex=True)
+for n, question_slug in enumerate(questions_by_mean_typical_age):
+    ax = axs[n]
+    all_xs = set()
+    all_xs |= typicals[question_slug].keys()
+    all_xs |= earlies[question_slug].keys()
+    all_xs |= lates[question_slug].keys()
+
+    lines = []
+    labels = []
+    for label, counter in [
+            ("typical", typicals[question_slug]),
+            ("mature", earlies[question_slug]),
+            ("immature", lates[question_slug])]:
+        xs = list(sorted(all_xs))
+        s = 0
+        t = sum(counter.values())
+        ys = []
+        for x in xs:
+            s += counter[x]
+            ys.append(100 * s / t)
+
+        line, = ax.plot(xs, ys, label=label)
+        lines.append(line)
+        labels.append(label)
+
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+    ax.set_title(question_slug, y=1.0, pad=-16)
+    ax.set_xlim(xmax=18, xmin=0)
+#plt.figlegend(lines, labels)
+fig.savefig("multi-cdf-big.png", dpi=206)
+plt.close()
 
 for child_label, counter in [
         ("typical", typicals),
