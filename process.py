@@ -523,7 +523,7 @@ for n, question_slug in enumerate(questions_by_mean_typical_age):
         labels.append(label)
 
     ax.yaxis.set_major_formatter(mtick.PercentFormatter())
-    ax.set_title(question_slug, y=1.0, pad=-16)
+    ax.set_title(questions[question_slug], loc="left", x=0.01, y=1.0, pad=-16)
     ax.set_xlim(xmax=18, xmin=0)
 #plt.figlegend(lines, labels)
 fig.savefig("multi-cdf-big.png", dpi=206)
