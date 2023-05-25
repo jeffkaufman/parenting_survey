@@ -188,6 +188,33 @@ for record in records:
     zscores = [x for x in zscores if not np.isnan(x)]
     record['mean_zscore'] = np.mean(zscores) if zscores else float('nan')
 
+# Which question is most representative?
+#
+# For each person - question pair we have a zscore, and we have the person's
+# mean zscore.  Representativeness for a person+question could be:
+#
+#    abs(zscore(person, question) - zscore(person, *))
+#
+# And then we could average this over questions?
+question_deltas = [] # delta, question
+for question_slug in questions:
+    deltas = []
+    for record in records:
+        mean_zscore = record['mean_zscore']
+        if np.isnan(mean_zscore):
+            continue
+
+        question_zscore = record["questions"][question_slug][-1]
+        if np.isnan(question_zscore):
+            continue
+        deltas.append(abs(question_zscore - mean_zscore))
+
+    question_deltas.append((
+        np.mean(deltas), question_slug))
+
+for delta, question_slug in sorted(question_deltas):
+    print(delta, question_slug)
+
 
 def short_label(question_slug):
     if question_slug.startswith("home"):
@@ -296,7 +323,12 @@ for variable in [
     if variable != "gender":
         labels.append("")
         x.append([])
-ax.boxplot(x, labels=labels, vert=False, showfliers=False)
+box = ax.boxplot(x, labels=labels, vert=False, showfliers=False)
+for _, line_list in box.items():
+    for line in line_list:
+        if line.get_color() != "black":
+            line.set_linewidth(line.get_linewidth() * 2)
+
 
 for n, points in enumerate(x):
     xs_prejitter = points
@@ -427,8 +459,10 @@ for question_slug, question_value in questions.items():
     box = ax.boxplot(x, labels=labels, vert=False, showfliers=False)
     for _, line_list in box.items():
         for line in line_list:
-            line.set_color((0,0,0,.3))
-
+            if line.get_color() == "black":
+                line.set_color((0,0,0,.3))
+            else:
+                line.set_linewidth(line.get_linewidth() * 2)
     for n, points in enumerate(x):
         xs_prejitter = points
         ys_prejitter = [n+1 for _ in points]
