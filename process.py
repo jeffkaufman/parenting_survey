@@ -6,7 +6,14 @@ import scipy
 from collections import defaultdict, Counter
 
 def is_na(s):
-    return not s or s in ["N/A", "N/a", "N/a--none here", "never", "100", "110"] or any(
+    s = s.strip()
+    return not s or s in [
+        "N/A", "N/a", "N/a--none here", "100", "110",
+        "I do not trust drivers in Somerville.",
+        "With a friend 12 Alone, unsure when he'll feel ready.",
+        "We don't have a sidewalk very close to our house",
+        "Depend on the kid maybe, depending on yard and traffic",
+    ] or any(
         s.startswith(x) for x in [
             "The age where they can",
             "Different for each of these",
@@ -21,18 +28,64 @@ def is_na(s):
             "depends on",
             "10? 12? so few good options here.",
             "ha. if only they'd learned.",
+            "I don't understand this question",
+            "2I don't understand this question",
+            "with supervision, like 4",
         ])
 
 def clean_age(s):
     if is_na(s):
         return float('nan')
-    s = s.replace("/", "-")
-    s = s.replace(", but depends", "")
-    s = s.replace("⁷", "7")
+
+    for f, r in [
+            # Handle verbose answers
+            ("8 for our neighborhood, 6-7 for a more suburban area ",
+             "8"),
+            ("12 ? Depends on which one! I do feel like it depends on the "
+             "particular street as I think there are good and bad crossings. Ie "
+             "busy roads by highways: super dangerous; Memorial Drive — is fast "
+             "but crossings close to Harvard Sq are pretty safe for peds.",
+             "12"),
+            (
+                "I’m assuming this is unsupervised? I’m having trouble "
+                "imaging an unfenced backyard in my neighborhood. Depends "
+                "on kkd if you’re worried they’ll wander off! 3? 4? My kid "
+                "would never wander off but I know kids who are runners",
+                "3"),
+            ("I do not trust drivers in Somerville. 8", "8"),
+            ("8 except I do not trust drivers in Somerville.", "8"),
+            ("8, depends on if other adults are known to be present", "8"),
+            ("10 but more dependent on neighborhood than child", "10"),
+            ("6. This is also the legal minimum age where I live", "6"),
+            ("9 due to threat of CPS; 8 due to threat of stranger danger. "
+             "I'd let a younger child play in neighborhood woods alone.", "8"),
+            ("7 if w/in quarter mile, 9 if more like a mile", "9"),
+            ("8, but I’m not sure my kid would be ready", "8"),
+            ("12 depends on kid and environment", "12"),
+            ("12 depends on neighborhood", "12"),
+            ('7 with a crosswalk signal', "7"),
+            # remove qualifiers
+            ("(unsupervised, you mean?)", ""),
+            ("Wildly child dependent.", ""),
+            ("almost ", ""),
+            (", but depends", ""),
+            # I'm interpreting "never" to mean "not while they're a kid"
+            ("I think of McGrath and say never", "18"),
+            ("Never — this is not something I believe to be appropriate",
+            "18"),
+            ("never", "18"),
+            ("no", "18"),
+            # alterantive ways of writing things
+            ("/", "-"),
+            ("⁷", "7"),
+            # treat 8+ etc as 8
+            ("+", ""),
+            # remove uncertainty markers
+            ("?", ""),
+    ]:
+        s = s.replace(f, r)
     s = re.sub(" [(].*[)]$", "", s)
-    s = s.replace(
-        "9 due to threat of CPS; 8 due to threat of stranger danger. I'd let "
-        "a younger child play in neighborhood woods alone.", "8")
+    s = s.strip()
     if "-" in s:
         return np.average([int(x) for x in s.split("-")])
     if s.endswith(" months"):
@@ -41,9 +94,12 @@ def clean_age(s):
         return int(s.replace(" weeks", ""))/52
     if s.endswith(" years"):
         s = s.replace(" years", "")
+    if s.endswith(" years old"):
+        s = s.replace(" years old", "")
     return float(s)
 
 def clean_age_range(s):
+    s = s.replace("5-10 (for ~0.25 mile), 7-12 (for ~1 mile)", "7-12")
     if is_na(s):
         return float('nan'), float('nan')
     s = s.replace(" to ", "-")
@@ -63,6 +119,7 @@ def clean_area(s):
         return 2, "moderately urban"
     if s in ["Slightly Urban (multi-family housing is common)",
              "Small town",
+             "Small Town which is walkable unless you want to leave town",
              "Medium town; mostly single-family housing, but schools, shops, "
              "restaurants and other destinations are walkable and bikeable"]:
         return 3, "slightly urban"
@@ -278,7 +335,10 @@ def tidy_label(variable, record):
             "rural": (4, "RUR then"),
         }[val[-1]]
     elif variable == "n_children":
-        return val + " kids"
+        if val == "0":
+            return ("0", "no kids")
+        else:
+            return (val, val + " kids")
     elif variable == "oldest":
         if val <= 2:
             return 1, "oldest 0-2"
