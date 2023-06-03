@@ -244,7 +244,7 @@ for record in records:
                for question_slug in questions]
     zscores = [x for x in zscores if not np.isnan(x)]
     record['mean_zscore'] = np.mean(zscores) if zscores else float('nan')
-
+    
 # Which question is most representative?
 #
 # For each person - question pair we have a zscore, and we have the person's
@@ -281,8 +281,95 @@ def short_label(question_slug):
     elif question_slug in ["transit", "bike", "school"] or question_slug.startswith("street"):
         return "movement"
 
+print("Responses: %s" % len(records))
+
+print("Gender counts:")
+genders = Counter()
+for record in records:
+    if record["gender"]:
+        genders[record["gender"]] += 1
+for gender in ["Male", "Female", "Non-binary"]:
+    print("  %s %s (%.0f%%)" % (
+        gender, genders[gender], 100 * genders[gender] / sum(genders.values())))    
+
+print("Area counts:")
+areas = Counter()
+for record in records:
+    if record["area"]:
+        areas[record["area"]] += 1
+for area in areas:
+    print("  %s %s (%.0f%%)" % (
+        area, areas[area], 100 * areas[area] / sum(areas.values())))    
+
+print("Childhood Area counts:")
+childhood_areas = Counter()
+for record in records:
+    if record["childhood_area"]:
+        childhood_areas[record["childhood_area"]] += 1
+for childhood_area in childhood_areas:
+    print("  %s %s (%.0f%%)" % (
+        childhood_area, childhood_areas[childhood_area], 100 * childhood_areas[childhood_area] / sum(childhood_areas.values())))    
+
+print("N children counts:")
+n_childrens = Counter()
+for record in records:
+    if record["n_children"]:
+        n_childrens[record["n_children"]] += 1
+for n_children in n_childrens:
+    print("  %s %s (%.0f%%)" % (
+        n_children, n_childrens[n_children], 100 * n_childrens[n_children] / sum(n_childrens.values())))    
+
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
+
+fig, ax = plt.subplots(constrained_layout=True)
+xs = []
+ys = []
+
+all_ages = []
+ages = Counter()
+for record in records:
+    if np.isnan(record['age']): continue
+    ages[record['age']] += 1
+    all_ages.append(record['age'])
+for age, count in ages.items():
+    xs.append(age)
+    ys.append(count)
+ax.set_title("Age distribution of respondents")
+ax.set_xlabel("Age")
+ax.set_ylabel("Number of respondents")
+ax.set_ylim(ymin=0, ymax=18)
+ax.scatter(xs, ys)
+fig.savefig("parenting-survey-age-distibution-big.png", dpi=180)
+plt.close()
+
+print("Median age: %s" % np.median(all_ages))
+
+fig, ax = plt.subplots(constrained_layout=True)
+xs = []
+ys = []
+all_oldests = []
+oldests = Counter()
+for record in records:
+    if np.isnan(record['oldest']): continue
+    oldests[round(record['oldest'])] += 1
+    all_oldests.append(record['oldest'])
+for oldest, count in oldests.items():
+    xs.append(oldest)
+    ys.append(count)
+ax.set_title("Distribution of the oldest child of respondents")
+ax.set_xlabel("Oldest child, if a parent")
+ax.set_ylabel("Number of respondents")
+ax.set_ylim(ymin=0, ymax=24)
+ax.scatter(xs, ys)
+fig.savefig("parenting-survey-oldest-distibution-big.png", dpi=180)
+plt.close()
+
+print("Fraction oldest under 18: %.0f%%" % (
+    100 * sum(1 for x in all_oldests if x < 18) /
+    len(all_oldests)))
+
+print("Median oldest: %s" % np.median(all_oldests))
 
 fig, ax = plt.subplots(constrained_layout=True)
 xs = []
@@ -296,7 +383,7 @@ ax.scatter(xs, ys)
 ax.set_title("Caution by age")
 ax.set_xlabel("Age")
 ax.set_ylabel("Caution z-score")
-fig.savefig("caution-by-age-big.png", dpi=180)
+fig.savefig("parenting-survey-caution-by-age-big.png", dpi=180)
 plt.close()
 
 fig, ax = plt.subplots(constrained_layout=True)
@@ -311,8 +398,90 @@ ax.scatter(xs, ys)
 ax.set_title("Caution by age of oldest child (parents only)")
 ax.set_xlabel("Age of oldest child")
 ax.set_ylabel("Caution z-score")
-fig.savefig("caution-by-age-of-oldest-big.png", dpi=180)
+fig.savefig("parenting-survey-caution-by-age-of-oldest-big.png", dpi=180)
 plt.close()
+
+
+fig, ax = plt.subplots(constrained_layout=True)
+sorted_areas = []
+ys = []
+xs = []
+for n, area in sorted(areas):
+    ys.append(area)
+    sorted_areas.append(area)
+    xs.append(areas[n, area])
+y_pos = np.arange(len(ys))
+ax.barh(y_pos, xs, align='center')
+ax.set_yticks(y_pos)
+ax.set_yticklabels(ys)
+ax.invert_yaxis()  # labels read top-to-bottom
+ax.set_xlabel('Respondents')
+ax.set_title('Location distribution of respondents')
+fig.savefig("parenting-survey-current-location-big.png", dpi=180)
+plt.close()
+
+fig, ax = plt.subplots(constrained_layout=True)
+ys = []
+xs = []
+for n, childhood_area in sorted(childhood_areas):
+    ys.append(childhood_area)
+    xs.append(childhood_areas[n, childhood_area])
+y_pos = np.arange(len(ys))
+ax.barh(y_pos, xs, align='center')
+ax.set_yticks(y_pos)
+ax.set_yticklabels(ys)
+ax.invert_yaxis()  # labels read top-to-bottom
+ax.set_xlabel('Respondents')
+ax.set_title('Childhood location distribution of respondents')
+fig.savefig("parenting-survey-childhood-location-big.png", dpi=180)
+plt.close()
+
+fig, ax = plt.subplots(constrained_layout=True)
+area_scatter_counts = Counter()
+for record in records:
+    if record["area"] and record["childhood_area"]:
+        area_scatter_counts[record["area"][0],
+                            record["childhood_area"][0]] += 1
+
+ys = []
+xs = []
+sizes= []
+for (y, x), count in area_scatter_counts.items():
+    xs.append(x)
+    ys.append(y)
+    sizes.append(count*30)
+
+plt.xticks([n+1 for n in range(len(sorted_areas))], sorted_areas,
+           rotation=45, ha='right')
+plt.yticks([n+1 for n in range(len(sorted_areas))], sorted_areas)
+ax.set_xlabel('Childhood area')
+ax.set_ylabel('Current area')
+
+ax.set_title('Relation between current area and childhood area')
+
+ax.scatter(xs, ys, sizes=sizes)
+
+fig.savefig("parenting-survey-location-relation-big.png", dpi=180)
+plt.close()        
+
+
+fig, ax = plt.subplots(constrained_layout=True)
+ys = []
+xs = []
+for n_children in sorted(n_childrens):
+    ys.append(n_children)
+    xs.append(n_childrens[n_children])
+y_pos = np.arange(len(ys))
+ax.barh(y_pos, xs, align='center')
+ax.set_yticks(y_pos)
+ax.set_yticklabels(ys)
+ax.invert_yaxis()  # labels read top-to-bottom
+ax.set_xlabel('Respondents')
+ax.set_title('Number of children')
+fig.savefig("parenting-survey-number-of-children-big.png", dpi=180)
+plt.close()
+
+
 
 def tidy_label(variable, record):
     val = record[variable]
@@ -400,7 +569,7 @@ for n, points in enumerate(x):
 
 ax.set_title("Factors influencing caution")
 ax.set_xlabel("Mean z-score")
-fig.savefig("factors-big.png", dpi=180)
+fig.savefig("parenting-survey-factors-big.png", dpi=180)
 plt.close()
 
 """
@@ -440,7 +609,7 @@ ax.yaxis.set_major_formatter(mtick.PercentFormatter())
 ax.set_title("Relationship of each respondent to others")
 ax.set_xlabel("Respondents, from least to most cautious")
 ax.set_ylabel("Per-question percentile")
-fig.savefig("individual-consistency-big.png", dpi=180)
+fig.savefig("parenting-survey-individual-consistency-big.png", dpi=180)
 plt.close()
 """
 
@@ -548,7 +717,7 @@ for question_slug, question_value in questions.items():
 
         ax.plot(xs, ys, 'b.', alpha=0.2)
 
-    fig.savefig("cdf-" +
+    fig.savefig("parenting-survey-cdf-" +
                 str(questions_by_mean_typical_age.index(question_slug)).zfill(2) +
                 "-" + question_slug + "-big.png", dpi=180)
     plt.close()
@@ -586,7 +755,30 @@ for n, question_slug in enumerate(questions_by_mean_typical_age):
     ax.set_title(questions[question_slug], loc="left", x=0.01, y=1.0, pad=-16)
     ax.set_xlim(xmax=18, xmin=0)
 #plt.figlegend(lines, labels)
-fig.savefig("multi-cdf-big.png", dpi=206)
+fig.savefig("parenting-survey-multi-cdf-big.png", dpi=206)
+plt.close()
+
+fig, ax = plt.subplots(constrained_layout=True)
+ys = []
+xs = []
+for n, question_slug in enumerate(questions_by_mean_typical_age):
+    q = questions[question_slug]
+    q = q.replace(", assuming they can cross all the streets", "")
+    ys.append(q)
+    xs.append(np.median([
+        typical_age for record in records
+        if not np.isnan(
+                typical_age := record["questions"][question_slug][0])]))
+
+y_pos = np.arange(len(ys))
+ax.barh(y_pos, xs, align='center')
+ax.set_yticks(y_pos)
+ax.set_yticklabels(ys)
+ax.invert_yaxis()  # labels read top-to-bottom
+ax.set_xlabel('Median response')
+ax.set_title('Activities by age at which children typically can handle them solo',
+             loc="left", x=-1.1)
+fig.savefig("parenting-survey-median-typical-age-big.png", dpi=180)
 plt.close()
 
 for child_label, counter in [
@@ -607,5 +799,5 @@ for child_label, counter in [
     ax.set_xlim(xmin=0,xmax=18)
     ax.boxplot(x, labels=labels, vert=False, showfliers=False)
     ax.set_title("Estimates for a %s child" % child_label)
-    fig.savefig(child_label + "-big.png", dpi=180)
+    fig.savefig("parenting-survey-" + child_label + "-big.png", dpi=180)
     plt.close()
