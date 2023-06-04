@@ -236,14 +236,28 @@ for question_slug in questions:
     typical_vals = [record["questions"][question_slug][0]
                     for record in records]
     typical_zscores = scipy.stats.zscore(typical_vals, nan_policy='omit')
-    for zscore, record in zip(typical_zscores, records):
+    typical_mean = np.mean([x for x in typical_vals if not np.isnan(x)])
+    typical_distance_from_mean_years = [
+        val - typical_mean
+        for val in typical_vals
+    ]
+    for zscore, distance_years, record in zip(
+            typical_zscores, typical_distance_from_mean_years, records):
         record["questions"][question_slug].append(zscore)
+        record["questions"][question_slug].append(distance_years)
+
 
 for record in records:
-    zscores = [record["questions"][question_slug][-1]
+    zscores = [record["questions"][question_slug][3]
                for question_slug in questions]
     zscores = [x for x in zscores if not np.isnan(x)]
     record['mean_zscore'] = np.mean(zscores) if zscores else float('nan')
+    
+    distances = [record["questions"][question_slug][4]
+                 for question_slug in questions]
+    distances = [x for x in distances if not np.isnan(x)]
+    record['mean_distance_years'] = \
+        np.mean(distances) if distances else float('nan')
     
 # Which question is most representative?
 #
@@ -487,38 +501,60 @@ def tidy_label(variable, record):
     val = record[variable]
     if variable == "area":
         return {
-            "very urban": (0, "URB now"),
-            "moderately urban": (0, "URB now"),
-            "slightly urban": (1, "~URB now"),
-            "suburban": (2, "SBR now"),
-            "exurban": (3, "EXB now"),
-            "rural": (4, "RUR now"),
+            "very urban": (0, "urban now"),
+            "moderately urban": (0, "urban now"),
+            "slightly urban": (0, "urban now"),
+            "suburban": (2, "suburban now"),
+            "exurban": (3, "exurban or rural now"),
+            "rural": (3, "exurban or rural now"),
         }[val[-1]]
     if variable == "childhood_area":
         return {
-            "very urban": (1, "URB then"),
-            "moderately urban": (1, "URB then"),
-            "slightly urban": (1, "URB then"),
-            "suburban": (2, "SBR then"),
-            "exurban": (3, "EXB then"),
-            "rural": (4, "RUR then"),
+            "very urban": (1, "urban then"),
+            "moderately urban": (1, "urban then"),
+            "slightly urban": (1, "urban then"),
+            "suburban": (2, "suburban then"),
+            "exurban": (3, "exurban then"),
+            "rural": (4, "rural then"),
         }[val[-1]]
     elif variable == "n_children":
         if val == "0":
             return ("0", "no kids")
         else:
+            if val in ["4", "5+"]:
+                val = "4+"
             return (val, val + " kids")
+    elif variable == "age":
+        if 7 <= val <= 9:
+            return 7, "7-9"
+        elif 20 <= val <= 29:
+            return 20, "20s" 
+        elif 30 <= val <= 34:
+            return 30, "30-34"
+        elif 35 <= val <= 39:
+            return 35, "35-39"  
+        elif 40 <= val <= 44:
+            return 40, "40-44"
+        elif 45 <= val <= 49:
+            return 45, "45-49"
+        elif val >= 50:
+            return 50, "50+"
+        return val
     elif variable == "oldest":
-        if val <= 2:
-            return 1, "oldest 0-2"
+        if val <= 3:
+            return 1, "oldest 0-3"
         elif val <= 5:
-            return 2, "oldest 3-5"
-        elif val <= 8:
-            return 3, "oldest 6-8"
+            return 2, "oldest 4-5"
+        elif val <= 7:
+            return 3, "oldest 6-7"
+        elif val <= 9:
+            return 4, "oldest 8-9"
         elif val <= 12:
-            return 4, "oldest 9-12"
+            return 5, "oldest 10-12"
+        elif val <= 18:
+            return 6, "oldest 13-18"
         else:
-            return 5, "oldest 13+"
+            return 7, "oldest 18+"
     elif variable == "gender":
         return {
             "Female": (1, "female"),
@@ -552,7 +588,7 @@ for variable in [
     if variable != "gender":
         labels.append("")
         x.append([])
-box = ax.boxplot(x, labels=labels, vert=False, showfliers=False)
+box = ax.boxplot(x, labels=labels, vert=False, showfliers=False, showmeans=True)
 for _, line_list in box.items():
     for line in line_list:
         if line.get_color() != "black":
@@ -567,10 +603,61 @@ for n, points in enumerate(x):
     ys = ys_prejitter + np.random.normal(0, 0.05, size=(len(points)))
     ax.plot(xs, ys, 'b.', alpha=0.2)
 
-ax.set_title("Factors influencing caution")
-ax.set_xlabel("Mean z-score")
+ax.set_title("Factors predicting higher-age responses")
+ax.set_xlabel("Mean z-score: larger values indicate higher-age responses")
 fig.savefig("parenting-survey-factors-big.png", dpi=180)
 plt.close()
+
+
+for figlabel, factors, figsize in [
+        ("areas", ("childhood_area", "area"), (8,4)),
+        ("kids", ("oldest", "n_children"), (8,6)),
+        ("self", ("gender", "age"), (8,8)),
+]:
+    fig, ax = plt.subplots(constrained_layout=True, figsize=figsize)
+    x = []
+    labels = []
+    for variable in factors:
+        def include(record):
+            return record[variable] and (
+                type(record[variable]) != type(0.0) or
+                not np.isnan(record[variable])
+            ) and not np.isnan(record['mean_distance_years'])
+        for label in sorted(set(tidy_label(variable, record)
+                                for record in records
+                                if include(record)),
+                            reverse=True):
+            vals = [record['mean_distance_years']
+                    for record in records
+                    if include(record) and tidy_label(variable, record) == label]
+            if type(label) == type(()):
+                _, label = label
+
+            labels.append("%s (n=%s)" % (label, len(vals)))
+            x.append(vals)
+
+        if variable != factors[-1]:
+            labels.append("")
+            x.append([])
+    box = ax.boxplot(x, labels=labels, vert=False, showfliers=False, showmeans=True)
+    for _, line_list in box.items():
+        for line in line_list:
+            if line.get_color() != "black":
+                line.set_linewidth(line.get_linewidth() * 2)
+
+    for n, points in enumerate(x):
+        xs_prejitter = points
+        ys_prejitter = [n+1 for _ in points]
+
+        xs = xs_prejitter + np.random.normal(0, 0.05, size=(len(points)))
+        ys = ys_prejitter + np.random.normal(0, 0.05, size=(len(points)))
+        ax.plot(xs, ys, 'b.', alpha=0.2)
+
+    ax.set_title("Factors predicting higher-age responses")
+    ax.set_xlabel("Mean years later than average")
+    fig.savefig("parenting-survey-factors-%s-age-distance-big.png" %
+                figlabel, dpi=180)
+    plt.close()
 
 """
 for variable_name in [
@@ -638,8 +725,9 @@ for question_slug, question_value in questions.items():
 
     for label, counter in [
             ("typical", typicals[question_slug]),
+            ("immature", lates[question_slug]),
             ("mature", earlies[question_slug]),
-            ("immature", lates[question_slug])]:
+    ]:
         xs = list(sorted(all_xs))
         s = 0
         t = sum(counter.values())
@@ -685,13 +773,11 @@ for question_slug, question_value in questions.items():
         if variable != "gender":
             labels.append("")
             x.append([])
-    box = ax.boxplot(x, labels=labels, vert=False, showfliers=False)
+    box = ax.boxplot(x, labels=labels, vert=False, showfliers=False,
+                     showmeans=True)
     for _, line_list in box.items():
         for line in line_list:
-            if line.get_color() == "black":
-                line.set_color((0,0,0,.3))
-            else:
-                line.set_linewidth(line.get_linewidth() * 2)
+            line.set_color((0,0,0,.3))
     for n, points in enumerate(x):
         xs_prejitter = points
         ys_prejitter = [n+1 for _ in points]
@@ -716,6 +802,7 @@ for question_slug, question_value in questions.items():
             ys.append(yval)
 
         ax.plot(xs, ys, 'b.', alpha=0.2)
+    ax.set_xlim(xmax=18, xmin=0)
 
     fig.savefig("parenting-survey-cdf-" +
                 str(questions_by_mean_typical_age.index(question_slug)).zfill(2) +
@@ -737,8 +824,9 @@ for n, question_slug in enumerate(questions_by_mean_typical_age):
     labels = []
     for label, counter in [
             ("typical", typicals[question_slug]),
+            ("immature", lates[question_slug]),
             ("mature", earlies[question_slug]),
-            ("immature", lates[question_slug])]:
+    ]:
         xs = list(sorted(all_xs))
         s = 0
         t = sum(counter.values())
@@ -781,10 +869,39 @@ ax.set_title('Activities by age at which children typically can handle them solo
 fig.savefig("parenting-survey-median-typical-age-big.png", dpi=180)
 plt.close()
 
+fig, ax = plt.subplots(constrained_layout=True)
+for label, pos, color in [
+        ("immature", 2, 'C1'),
+        ("typical", 0, 'C0'),
+        ("mature", 1, 'C2'),
+]: 
+    ys = []
+    xs = []
+    for n, question_slug in enumerate(questions_by_mean_typical_age):
+        q = questions[question_slug]
+        q = q.replace(", assuming they can cross all the streets", "")
+        ys.append(q)
+        xs.append(np.median([
+            typical_age for record in records
+            if not np.isnan(
+                    typical_age := record["questions"][question_slug][pos])]))
+    ax.barh(y_pos, xs, align='center', color=color, label=label)
+ax.legend()
+y_pos = np.arange(len(ys))
+ax.set_yticks(y_pos)
+ax.set_yticklabels(ys)
+ax.invert_yaxis()  # labels read top-to-bottom
+ax.set_xlabel('Median response')
+ax.set_title('Activities by age at which children typically can handle them solo',
+             loc="left", x=-1.1)
+fig.savefig("parenting-survey-median-multi-age-big.png", dpi=180)
+plt.close()
+
 for child_label, counter in [
         ("typical", typicals),
+        ("immature", lates),
         ("mature", earlies),
-        ("immature", lates)]:
+]:
     fig, ax = plt.subplots(constrained_layout=True)
     mean_label_row = []
     for question_slug, question_value in questions.items():
