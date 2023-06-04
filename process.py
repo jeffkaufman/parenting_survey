@@ -209,7 +209,16 @@ with open(fname) as inf:
 
         record["n_children"] = clean_n_children(v(
             "How many children do you have, if any?"))
-
+        
+        if record["n_children"] is None:
+            record["is_parent"] = float("nan")
+        elif record["n_children"] == "0":
+            record["is_parent"] = 2
+        elif record["n_children"] in ["1", "2", "3", "4", "5+"]:
+            record["is_parent"] = 1
+        else:
+            assert False, record["n_children"]
+            
         record["gender"] = clean_gender(v(
             "What's your gender?"))
 
@@ -499,6 +508,12 @@ plt.close()
 
 def tidy_label(variable, record):
     val = record[variable]
+    if variable == "is_parent":
+        #print(val)
+        return {
+            1: "parents",
+            2: "non-parents",
+        }[val]
     if variable == "area":
         return {
             "very urban": (0, "urban now"),
@@ -527,8 +542,8 @@ def tidy_label(variable, record):
     elif variable == "age":
         if 7 <= val <= 9:
             return 7, "7-9"
-        elif 20 <= val <= 29:
-            return 20, "20s" 
+        elif 25 <= val <= 29:
+            return 25, "25-29" 
         elif 30 <= val <= 34:
             return 30, "30-34"
         elif 35 <= val <= 39:
@@ -610,9 +625,10 @@ plt.close()
 
 
 for figlabel, factors, figsize in [
-        ("areas", ("childhood_area", "area"), (8,4)),
-        ("kids", ("oldest", "n_children"), (8,6)),
-        ("self", ("gender", "age"), (8,8)),
+        ("areas", ("childhood_area", "area"), (8,3)),
+        ("kids", ("oldest", "n_children", "is_parent"), (8,5)),
+        ("gender", ("gender", ), (8,2)),
+        ("age", ("age", ), (8,3)),
 ]:
     fig, ax = plt.subplots(constrained_layout=True, figsize=figsize)
     x = []
@@ -632,6 +648,8 @@ for figlabel, factors, figsize in [
                     if include(record) and tidy_label(variable, record) == label]
             if type(label) == type(()):
                 _, label = label
+
+            if label == "no kids": continue
 
             labels.append("%s (n=%s)" % (label, len(vals)))
             x.append(vals)
@@ -853,20 +871,25 @@ for n, question_slug in enumerate(questions_by_mean_typical_age):
     q = questions[question_slug]
     q = q.replace(", assuming they can cross all the streets", "")
     ys.append(q)
-    xs.append(np.median([
+    xs.append(np.mean([
         typical_age for record in records
         if not np.isnan(
                 typical_age := record["questions"][question_slug][0])]))
 
 y_pos = np.arange(len(ys))
 ax.barh(y_pos, xs, align='center')
+for i in range(len(xs)):
+    plt.text(xs[i] - 0.1 , i + 0.15,
+             "%.1f"%xs[i],
+             horizontalalignment='right', color="w")
+ax.set_xlim(xmin=0,xmax=18)
 ax.set_yticks(y_pos)
 ax.set_yticklabels(ys)
 ax.invert_yaxis()  # labels read top-to-bottom
-ax.set_xlabel('Median response')
+ax.set_xlabel('Mean age')
 ax.set_title('Activities by age at which children typically can handle them solo',
              loc="left", x=-1.1)
-fig.savefig("parenting-survey-median-typical-age-big.png", dpi=180)
+fig.savefig("parenting-survey-mean-typical-age-big.png", dpi=180)
 plt.close()
 
 fig, ax = plt.subplots(constrained_layout=True)
@@ -881,20 +904,28 @@ for label, pos, color in [
         q = questions[question_slug]
         q = q.replace(", assuming they can cross all the streets", "")
         ys.append(q)
-        xs.append(np.median([
+        xs.append(np.mean([
             typical_age for record in records
             if not np.isnan(
                     typical_age := record["questions"][question_slug][pos])]))
+    y_pos = np.arange(len(ys))
     ax.barh(y_pos, xs, align='center', color=color, label=label)
+
+    if label != "typical":
+        for i in range(len(xs)):
+            plt.text(xs[i] - 0.1 , i + 0.15,
+                     "%.1f"%xs[i],
+                     horizontalalignment='right', color="w")
+ax.set_xlim(xmin=0,xmax=18)
 ax.legend()
 y_pos = np.arange(len(ys))
 ax.set_yticks(y_pos)
 ax.set_yticklabels(ys)
 ax.invert_yaxis()  # labels read top-to-bottom
-ax.set_xlabel('Median response')
+ax.set_xlabel('Mean age')
 ax.set_title('Activities by age at which children typically can handle them solo',
              loc="left", x=-1.1)
-fig.savefig("parenting-survey-median-multi-age-big.png", dpi=180)
+fig.savefig("parenting-survey-mean-multi-age-big.png", dpi=180)
 plt.close()
 
 for child_label, counter in [
