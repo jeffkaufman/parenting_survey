@@ -366,6 +366,40 @@ ax.scatter(xs, ys)
 fig.savefig("parenting-survey-age-distibution-big.png", dpi=180)
 plt.close()
 
+fig, ax = plt.subplots(constrained_layout=True)
+xs = []
+ys = []
+
+ages = Counter()
+for record in records:
+    if np.isnan(record['age']): continue
+    if np.isnan(record['mean_distance_years']): continue
+    xs.append(record['age'])
+    ys.append(record['mean_distance_years'])
+ax.set_title("Relation between age and higher-age responses")
+ax.set_xlabel("Respondent age")
+ax.set_ylabel("Mean years later than average")
+ax.scatter(xs, ys)
+fig.savefig("parenting-survey-age-vs-relative-big.png", dpi=180)
+plt.close()
+
+fig, ax = plt.subplots(constrained_layout=True)
+xs = []
+ys = []
+
+ages = Counter()
+for record in records:
+    if np.isnan(record['oldest']): continue
+    if np.isnan(record['mean_distance_years']): continue
+    xs.append(record['oldest'])
+    ys.append(record['mean_distance_years'])
+ax.set_title("Relation between age of oldest child and higher-age responses")
+ax.set_xlabel("Respondent's oldest child")
+ax.set_ylabel("Mean years later than average")
+ax.scatter(xs, ys)
+fig.savefig("parenting-survey-oldest-vs-relative-big.png", dpi=180)
+plt.close()
+
 print("Median age: %s" % np.median(all_ages))
 
 fig, ax = plt.subplots(constrained_layout=True)
