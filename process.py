@@ -458,6 +458,13 @@ ax.set_ylabel("Caution z-score")
 fig.savefig("parenting-survey-caution-by-age-of-oldest-big.png", dpi=180)
 plt.close()
 
+oldest_at_birth = []
+for record in records:
+    if np.isnan(record['age']): continue
+    if np.isnan(record['oldest']): continue
+    oldest_at_birth.append(record['age'] - record['oldest'])
+print("Mean age at first child: %s" % np.mean(oldest_at_birth))
+print("Median age at first child: %s" % np.median(oldest_at_birth))
 
 fig, ax = plt.subplots(constrained_layout=True)
 sorted_areas = []
@@ -983,3 +990,18 @@ for child_label, counter in [
     ax.set_title("Estimates for a %s child" % child_label)
     fig.savefig("parenting-survey-" + child_label + "-big.png", dpi=180)
     plt.close()
+
+# exporting
+import json
+records.sort(key=lambda record: record["mean_distance_years"])
+for record in records:
+    for question_slug in questions:
+        record["questions"][question_slug] = {
+            "typical": record["questions"][question_slug][0],
+            "mature": record["questions"][question_slug][1],
+            "immature": record["questions"][question_slug][2],
+            "years_above_mean": record["questions"][question_slug][3],
+            "zscore": record["questions"][question_slug][4],
+        }
+with open("export.json", "w") as outf:
+    json.dump(records, outf, sort_keys=True, indent=2)
