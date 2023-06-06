@@ -267,6 +267,17 @@ for record in records:
     distances = [x for x in distances if not np.isnan(x)]
     record['mean_distance_years'] = \
         np.mean(distances) if distances else float('nan')
+    record["highlight"] = None
+    if (record["age"] == 37 and
+        record["gender"] == "Male" and
+        record["area"][1] == "moderately urban" and
+        record["childhood_area"][1] == "slightly urban"):
+        record["highlight"] = 'b'
+    if record["age"] == 7:
+        record["highlight"] = 'r'
+    if record["age"] == 9 and  record["area"][1] == "moderately urban":
+        record["highlight"] = 'r'
+              
     
 # Which question is most representative?
 #
@@ -905,6 +916,49 @@ for n, question_slug in enumerate(questions_by_mean_typical_age):
 fig.savefig("parenting-survey-multi-cdf-big.png", dpi=206)
 plt.close()
 
+fig, axs = plt.subplots(constrained_layout=True, nrows=13, ncols=1,
+                        figsize=(8,24),
+                        sharey=True,
+                        sharex=True)
+for n, question_slug in enumerate(questions_by_mean_typical_age):
+    ax = axs[n]
+    all_xs = set()
+    all_xs |= typicals[question_slug].keys()
+    all_xs |= earlies[question_slug].keys()
+    all_xs |= lates[question_slug].keys()
+
+    lines = []
+    labels = []
+    for label, counter in [
+            ("typical", typicals[question_slug]),
+            ("immature", lates[question_slug]),
+            ("mature", earlies[question_slug]),
+    ]:
+        xs = list(sorted(all_xs))
+        s = 0
+        t = sum(counter.values())
+        ys = []
+        for x in xs:
+            s += counter[x]
+            ys.append(100 * s / t)
+
+        line, = ax.plot(xs, ys, label=label)
+        lines.append(line)
+        labels.append(label)
+
+    for record in records:
+        if not record["highlight"]: continue
+
+        typical, mature, immature, *_ = record["questions"][question_slug]
+        ax.axvline(x=typical, color = record["highlight"])
+
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+    ax.set_title(questions[question_slug], loc="left", x=0.01, y=1.0, pad=-16)
+    ax.set_xlim(xmax=18, xmin=0)
+#plt.figlegend(lines, labels)
+fig.savefig("parenting-survey-multi-cdf-highlight-big.png", dpi=206)
+plt.close()
+
 fig, ax = plt.subplots(constrained_layout=True)
 ys = []
 xs = []
@@ -1000,8 +1054,8 @@ for record in records:
             "typical": record["questions"][question_slug][0],
             "mature": record["questions"][question_slug][1],
             "immature": record["questions"][question_slug][2],
-            "years_above_mean": record["questions"][question_slug][3],
-            "zscore": record["questions"][question_slug][4],
+            "zscore": record["questions"][question_slug][3],
+            "years_above_mean": record["questions"][question_slug][4],
         }
 with open("export.json", "w") as outf:
     json.dump(records, outf, sort_keys=True, indent=2)
