@@ -916,6 +916,47 @@ for n, question_slug in enumerate(questions_by_mean_typical_age):
 fig.savefig("parenting-survey-multi-cdf-big.png", dpi=206)
 plt.close()
 
+fig, ax = plt.subplots(constrained_layout=True, nrows=1, ncols=1,
+                        figsize=(8,4),
+                        sharey=True,
+                        sharex=True)
+for n, question_slug in enumerate(questions_by_mean_typical_age):
+    if question_slug != "transit":
+        continue
+
+    all_xs = set()
+    all_xs |= typicals[question_slug].keys()
+    all_xs |= earlies[question_slug].keys()
+    all_xs |= lates[question_slug].keys()
+
+    lines = []
+    labels = []
+    for label, counter in [
+            ("typical", typicals[question_slug]),
+            ("immature", lates[question_slug]),
+            ("mature", earlies[question_slug]),
+    ]:
+        xs = list(sorted(all_xs))
+        s = 0
+        t = sum(counter.values())
+        ys = []
+        for x in xs:
+            s += counter[x]
+            ys.append(100 * s / t)
+
+        line, = ax.plot(xs, ys, label=label)
+        lines.append(line)
+        labels.append(label)
+
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+    ax.set_title(
+        "Age at which a child can first handle taking public transit solo")
+    ax.set_xlim(xmax=18, xmin=0)
+    ax.legend()
+
+fig.savefig("parenting-survey-transit-cdf-big.png", dpi=206)
+plt.close()
+
 fig, axs = plt.subplots(constrained_layout=True, nrows=13, ncols=1,
                         figsize=(8,24),
                         sharey=True,
